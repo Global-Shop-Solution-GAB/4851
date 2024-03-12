@@ -1,0 +1,48 @@
+Program.Sub.Preflight.Start
+
+Program.Sub.Preflight.End
+
+Program.Sub.Main.Start
+F.Intrinsic.Control.SetErrorHandler("Main_Err")
+F.Intrinsic.Control.ClearErrors
+'BN Dec 6, 2017
+
+'Order Entry > Reports > Shipment Pick List
+'Report ID: 000071
+
+'If we include the V_Inventory_All (to get LBS and CNTNRS_PER_PALLET fields) in the Pick List report, it will cause the report to run very slowly due to multiple link of database views.
+'So we will let the GAB to collect data from Inventory_Mst2.LBS and Inventory_Mst3.CNTNRS_PER_PALLET then save to the custom table GCG_4851_Part and include this custom table in the report
+
+v.Local..BulkDeclareString(sError,sMap,sSQL)
+
+f.Intrinsic.Control.If(v.Caller.Hook,=,16090)
+
+	f.Intrinsic.Control.If(Variable.Passed.009001,=,"000071")
+		F.odbc.Connection!con.OpenConnection(V.Ambient.PDSN,V.Ambient.PUser,V.Ambient.PPass,600)
+		'Pull data from Inventory_Mst2 and Inventory_Mst3 and save to GCG_4851_Part
+		v.Local.sMap.Set("Part@!@Part*!*Location@!@Location*!*LBS@!@LBS*!*CNTNRS_PER_PALLET@!@CNTNRS_PER_PALLET")
+		f.ODBC.Connection!con.Execute("Delete from GCG_4851_Part")
+		f.Intrinsic.String.Build("select i2.Part, i2.Location, i2.LBS, i3. CNTNRS_PER_PALLET from Inventory_MST2 i2 join Inventory_MST3 i3 on i2.Part = i3.Part and i2.Location = i3.Location where i2.Part in (Select distinct Part from bi_ship_pick where rptid = '000071' and trmnl = '{0}')",v.Caller.Terminal,v.Local.sSQL)
+		f.Data.DataTable.CreateFromSQL("D","con",v.Local.sSQL,True)	
+		f.Data.DataTable.SaveToDB("D","con","GCG_4851_Part","",128,v.Local.sMap)
+		f.Data.DataTable.Close("D")		
+		f.ODBC.Connection!con.Close
+	f.Intrinsic.Control.EndIf
+
+f.Intrinsic.Control.EndIf
+
+F.Intrinsic.Control.ExitSub
+
+F.Intrinsic.Control.Label("Main_Err")
+F.Intrinsic.Control.If(V.Ambient.ErrorNumber,<>,0)
+	Function.Intrinsic.String.Concat("Project: GCG_4851_PickList.g2u",V.Ambient.Newline,V.Ambient.Newline,"Subroutine: ",V.Ambient.CurrentSubroutine,V.Ambient.NewLine,"Error Occurred ",V.Ambient.ErrorNumber," with description ",V.Ambient.ErrorDescription,V.Local.sError)
+	F.Intrinsic.UI.Msgbox(V.Local.sError)
+Function.Intrinsic.Control.EndIf
+
+
+Program.Sub.Main.End
+
+Program.Sub.Comments.Start
+${$0$}$$}$$}$12/6/2017 4:09:20 PM$}$False
+${$3$}$0$}$$}$-1$}$-1$}$$}$1/1/1900$}$Quote 3904 - ACH file export
+Program.Sub.Comments.End
